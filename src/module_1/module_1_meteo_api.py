@@ -4,11 +4,18 @@ import logging
 import time
 import sys
 import json
+import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
+import urllib3
+
+# Disable the InsecureRequestWarning due to using verify=False from corp laptop
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 
 """Define global variables"""
+
 API_URL = "https://climate-api.open-meteo.com/v1/climate?"
 
 COOL_OFF_TIME = 5
@@ -24,6 +31,7 @@ VARIABLES = "temperature_2m_mean,precipitation_sum,soil_moisture_0_to_10cm_mean"
 
 # All models have data for the 3 variables except soil moisture, which is only provided by MRI_AGCM3 and EC_Earth
 MODELS = "CMCC_CM2_VHR4,FGOALS_f3_H,HiRAM_SIT_HR,MRI_AGCM3_2_S,EC_Earth3P_HR,MPI_ESM1_2_XR,NICAM16_8S"
+
 
 """Define auxiliar functions"""
 
@@ -74,6 +82,10 @@ def get_data_meteo_api(city, from_year, until_year):
 
 
 def clean_data(raw_data):
+    """
+    (Not used) 
+    Function defined for cleaning None values inside a dictionary
+    """
     cleaned_data = {}
     for key, value in raw_data.items():
         if value is not None:
@@ -97,74 +109,96 @@ def clean_data(raw_data):
 
 
 def process_data(data):
-    # FIX!
-    # Create an empty dict to store processed data
-    processed_data = {}
-    daily_data = data["daily"]
-
-    for variable in daily_data.keys():
-        for i in range(len(daily_data.keys())):
-            # Extract the 'time' and 'value' data for the variable
-            variable_data = daily_data[variable]
-            time = variable_data[0]
-            values = variable_data[i]
-
-        # Calculate average and deviation for this variable
-        # average = np.mean(values)
-        # deviation = np.std(values)
-
-        # Store the results in the processed_data dictionary
-        # processed_data[variable] = {'average': average, 'deviation': deviation}
-
-    return processed_data
+    """
+    Reads a df and for each city calculates mean + std for each variable
+    """
+    calculated_df = data[["city", "time"]].copy()
+    for var in VARIABLES.split(","):
+        # For each climate var in the loop, if the name is in variable, it stores the column
+        idxs = [col for col in data.columns if col.startswith(var)]
+        # Save each variable with its corresponding mean and std. Axis=1 as calculated per each row.
+        # We have decided to compute the mean of all models for one day
+        # e.g. mean of all precipitation_sum for Madrid on 1950-01-01
+        # We could have done the mean of all occurences during one year for one model
+        calculated_df[f"{var}_mean"] = data[idxs].mean(axis=1)
+        calculated_df[f"{var}_std"] = data[idxs].std(axis=1)
+    return calculated_df
 
 
-def process_data_alternative(clean_data):
-    # trying another  solution ???
-    # Create an empty dict to store processed data
-    processed_data = {}
-    daily_data = clean_data["daily"]
-    print(clean_data)
-    # Extract the 'daily' data
-    # print(daily_data)
-    # return daily_data
-    # Loop through each variable defined in VARIABLES
-    for index in range(len(daily_data["time"])):
-        lista = []
-        for variable in daily_data.keys():
-            # print(variable)
-            lista.append(daily_data[variable][index - 1])
+def plot_data(data):
+    """
+    Plot data for each variable and city. 1 plot per variable
+    """
+    plt.style.use("bmh")
+    # plt.rcdefaults()
 
-            # variable_data = daily_data[variable]
+    # We create the grid which will be 3 graphs
+    rows = 3
+    cols = 1
+    fig, axs = plt.subplots(rows, cols, figsize=(15, 10))
+    # Convert the 2D plot into 1D for easier iteration
+    axs = axs.flatten()
 
-            processed_data[lista[0]] = lista[1:]
-            # Extract the 'time' and 'value' data for the variable
-            # print(processed_data)
+    # We rescale the dates for taking only years
+    data["year"] = pd.to_datetime(data["time"]).dt.year
 
-            # value_data_point = data_point[variable]
-            # time = variable_data[variable]
-            # values = variable_data[variable_data[0]]
-            # time.append(time_data_point)
-            # values.append(value_data_point)
+    # Enter a loop that iterates over unique city
+    for i, city in enumerate(data.city.unique()):
+        # Filters data to select only that city we're iterating
+        city_data = data.loc[lambda x: x.city == city, :]
+        print(city_data.head())
 
-            # Calculate average and deviation for this variable
-            # average = np.mean(values)
-            # deviation = np.std(values)
+        # Now for each variable we
+        for k, var in enumerate(VARIABLES.split(",")):
+            city_data["mid_line"] = city_data[f"{var}_mean"]
+            city_data["upper_line"] = city_data[f"{var}_mean"] + city_data[f"{var}_std"]
+            city_data["lower_line"] = city_data[f"{var}_mean"] - city_data[f"{var}_std"]
+            # Plot yearly mean values
+            # We have rescaled them to keep only year, now we group then by that
+            city_data.groupby("year")["mid_line"].apply("mean").plot(
+                ax=axs[k], label=f"{city}", color=f"C{i}"
+            )
+            city_data.groupby("year")["upper_line"].apply("mean").plot(
+                ax=axs[k], ls="--", label="_nolegend_", color=f"C{i}"
+            )
+            city_data.groupby("year")["lower_line"].apply("mean").plot(
+                ax=axs[k], ls="--", label="_nolegend_", color=f"C{i}"
+            )
+            axs[k].set_title(var)
 
-            # Store the results in the processed_data dictionary
-            # processed_data[variable] = {'average': average, 'deviation': deviation}
-    print(processed_data)
-    # return processed_data'''
+    plt.tight_layout()
+    plt.legend(
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.1),
+        fancybox=True,
+        shadow=True,
+        ncol=5,
+    )
+    plt.savefig("src/module_1/climate_evolution.png")  # save the figure to file
 
-
-def plot_data():
     pass
 
 
 def main():
-    data = get_data_meteo_api("Madrid", 1950, 2050)
-    cleaned_data = clean_data(data)
-    processed_data = process_data(cleaned_data)
+    # data = get_data_meteo_api("Madrid", 1950, 2050)
+    # cleaned_data = clean_data(data)
+    # processed_data = process_data(cleaned_data)
+    # print(processed_data)
+    data = []
+    for city, coord in COORDINATES.items():
+        data.append(
+            pd.DataFrame(get_data_meteo_api(city, 1950, 2050)["daily"]).assign(
+                city=city
+            )
+        )
+
+    data_df = pd.concat(data)
+    print(data_df.head())
+
+    calculated_df = process_data(data_df)
+    print(calculated_df)
+
+    plot_data(calculated_df)
 
 
 if __name__ == "__main__":
