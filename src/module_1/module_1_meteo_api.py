@@ -36,7 +36,6 @@ MODELS = "CMCC_CM2_VHR4,FGOALS_f3_H,HiRAM_SIT_HR,MRI_AGCM3_2_S,EC_Earth3P_HR,MPI
 
 """Define auxiliar functions"""
 
-
 def call_api(url):
     # Need to add the verify=False as working from my corporate laptop.
     # Tried to authenticate SSL by changing lots of config, disabled SSL, etc
@@ -180,8 +179,6 @@ def plot_data(data):
         ncol=5,
     )
     plt.savefig("src/module_1/climate_evolution.png")  # save fig to path
-
-    pass
 
 
 def main():
