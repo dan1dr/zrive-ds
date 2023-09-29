@@ -3,14 +3,14 @@ import requests
 import logging
 import time
 import sys
-import json
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-import pickle
 import urllib3
+# import json
+# import numpy as np
 
-# Disable the InsecureRequestWarning due to using verify=False from corp laptop
+
+# Disable the InsecureRequestWarning due to using verify=False from corporate laptop
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
@@ -29,16 +29,18 @@ COORDINATES = {
 
 VARIABLES = "temperature_2m_mean,precipitation_sum,soil_moisture_0_to_10cm_mean"
 
-# All models have data for the 3 variables except soil moisture, which is only provided by MRI_AGCM3 and EC_Earth
-MODELS = "CMCC_CM2_VHR4,FGOALS_f3_H,HiRAM_SIT_HR,MRI_AGCM3_2_S,EC_Earth3P_HR,MPI_ESM1_2_XR,NICAM16_8S"
+# All models have data for the 3 variables except soil moisture
+# which is only provided by MRI_AGCM3 and EC_Earth
+MODELS = "CMCC_CM2_VHR4,FGOALS_f3_H,HiRAM_SIT_HR,MRI_AGCM3_2_S,EC_Earth3P_HR,MPI_ESM1_2_XR,NICAM16_8S" # noqa
 
 
 """Define auxiliar functions"""
 
 
 def call_api(url):
-    # Need to add the verify=False as working from my corporate laptop. Tried to authenticate SSL by changing
-    # lots of different things but issue still arises. Disabled SSL but only works from the office - not the best practice I know
+    # Need to add the verify=False as working from my corporate laptop.
+    # Tried to authenticate SSL by changing lots of config, disabled SSL, etc
+    # It only works from the office - not the best practice I know # noqa
     try:
         # to-do: add the cool off
         response = requests.get(url, verify=False)
@@ -64,7 +66,10 @@ def get_data_meteo_api(city, from_year, until_year):
     long = coordinates["longitude"]
 
     # Create the final URL
-    url = f"{API_URL}latitude={lat}&longitude={long}&start_date={from_year}-01-01&end_date={until_year}-12-31&models={MODELS}&daily={VARIABLES}"
+    url = (
+        f"{API_URL}latitude={lat}&longitude={long}&start_date={from_year}"
+        f"-01-01&end_date={until_year}-12-31&models={MODELS}&daily={VARIABLES}"
+    )
 
     # Define a num of max attempts for calling again
     retry_count = 0
@@ -83,7 +88,7 @@ def get_data_meteo_api(city, from_year, until_year):
 
 def clean_data(raw_data):
     """
-    (Not used) 
+    (Not used)
     Function defined for cleaning None values inside a dictionary
     """
     cleaned_data = {}
@@ -114,9 +119,9 @@ def process_data(data):
     """
     calculated_df = data[["city", "time"]].copy()
     for var in VARIABLES.split(","):
-        # For each climate var in the loop, if the name is in variable, it stores the column
+        # For each climate var in the loop, if the name is in variable it's stored
         idxs = [col for col in data.columns if col.startswith(var)]
-        # Save each variable with its corresponding mean and std. Axis=1 as calculated per each row.
+        # Save each variable with its corresponding mean and std (axis=1 per each row)
         # We have decided to compute the mean of all models for one day
         # e.g. mean of all precipitation_sum for Madrid on 1950-01-01
         # We could have done the mean of all occurences during one year for one model
@@ -174,7 +179,7 @@ def plot_data(data):
         shadow=True,
         ncol=5,
     )
-    plt.savefig("src/module_1/climate_evolution.png")  # save the figure to file
+    plt.savefig("src/module_1/climate_evolution.png")  # save fig to path
 
     pass
 
@@ -183,7 +188,6 @@ def main():
     # data = get_data_meteo_api("Madrid", 1950, 2050)
     # cleaned_data = clean_data(data)
     # processed_data = process_data(cleaned_data)
-    # print(processed_data)
     data = []
     for city, coord in COORDINATES.items():
         data.append(
