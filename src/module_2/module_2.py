@@ -15,7 +15,7 @@ urllib3.disable_warnings()
 #Adding verify = False as same issue in previous modules with corporate proxy
 s3 = boto3.resource('s3',
                 aws_access_key_id='AKIAXN64CPXKVY56HGZZ',
-                aws_secret_access_key='XYZ',
+                aws_secret_access_key='XXX',
                 verify = False)
 
 bucket_name = 'zrive-ds-data'
@@ -24,12 +24,14 @@ prefix = 'groceries/sampled-datasets/'
 # Create a bucket object
 bucket = s3.Bucket(bucket_name)
 
+# Empty dict to store dfs when reading
+
 #Iterate through the objects inside
 for obj in bucket.objects.filter(Prefix = prefix):
     key = obj.key
 
     if key.endswith('.parquet'):
-        print(f"Reading Parquet file: {key}")
+        print(f"-- Reading Parquet file: {key}")
         
         try:
             # Get the S3 object
@@ -42,8 +44,13 @@ for obj in bucket.objects.filter(Prefix = prefix):
             # Create a BytesIO object for seeking
             parquet_io = BytesIO(parquet_bytes)
 
-            df = pd.read_parquet(parquet_io)
-            print(df.head())
+            df_name = key.split('/')[-1].split('.')[0]
+
+            globals()[f'df_{df_name}'] = pd.read_parquet(parquet_io)
+
+            print(f"The number of cols and rows is: {globals()[f'df_{df_name}'].shape}")
+            print(globals()[f'df_{df_name}'].head())
+            print(f"-- The df named df_{df_name} has been saved\n")
 
         except IOError as io_err:
             print(f"IOError reading {key}: {io_err}")
