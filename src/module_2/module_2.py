@@ -24,12 +24,14 @@ prefix = 'groceries/sampled-datasets/'
 # Create a bucket object
 bucket = s3.Bucket(bucket_name)
 
-# Empty dict to store dfs when reading
+# Empty dict in case we need to iterate over
+dfs = {}
 
 #Iterate through the objects inside
 for obj in bucket.objects.filter(Prefix = prefix):
     key = obj.key
 
+    # We will keep a list of dfs in case we need to iterate over
     if key.endswith('.parquet'):
         print(f"-- Reading Parquet file: {key}")
         
@@ -44,12 +46,15 @@ for obj in bucket.objects.filter(Prefix = prefix):
             # Create a BytesIO object for seeking
             parquet_io = BytesIO(parquet_bytes)
 
+            # We retrieve the actual filename
             df_name = key.split('/')[-1].split('.')[0]
 
-            globals()[f'df_{df_name}'] = pd.read_parquet(parquet_io)
+            # Save as individual files and also inside a dict
+            df = globals()[f'df_{df_name}'] = pd.read_parquet(parquet_io)
+            dfs[df_name] = df
 
-            print(f"The number of cols and rows is: {globals()[f'df_{df_name}'].shape}")
-            print(globals()[f'df_{df_name}'].head())
+            print(f"The number of cols and rows is: {df.shape}")
+            print(df.head())
             print(f"-- The df named df_{df_name} has been saved\n")
 
         except IOError as io_err:
