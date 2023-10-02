@@ -20,6 +20,7 @@ boto3 = "^1.28.57"
 fastparquet = "^2023.8.0"
 jupyter = "^1.0.0"
 ipykernel = "^6.25.2"
+seaborn = "^0.13.0"
 
 
 [tool.poetry.group.dev.dependencies]
