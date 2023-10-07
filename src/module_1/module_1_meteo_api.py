@@ -107,34 +107,6 @@ def get_data_meteo_api(city, from_year, until_year):
         print("Failed to retrieve data from the API.")
         return None
 
-
-def clean_data(raw_data):
-    """
-    (Not used)
-    Function defined for cleaning None values inside a dictionary
-    """
-    cleaned_data = {}
-    for key, value in raw_data.items():
-        if value is not None:
-            if isinstance(value, dict):
-                cleaned_value = clean_data(
-                    value
-                )  # Recursively clean sub-dictionaries starting again
-                if (
-                    cleaned_value
-                ):  # Check if the sub-dictionary is not empty after cleaning
-                    cleaned_data[key] = cleaned_value
-
-            elif isinstance(value, list):  # do the same but for list within the dict
-                # Clean each item in a list
-                cleaned_list = [item for item in value if item is not None]
-                if cleaned_list:
-                    cleaned_data[key] = cleaned_list
-            else:
-                cleaned_data[key] = value
-    return cleaned_data
-
-
 def process_data(data):
     """
     Reads a df and for each city calculates mean + std for each variable
@@ -227,6 +199,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# response = get_data_meteo_api("Madrid", 1950, 2050)
-# print(response)
