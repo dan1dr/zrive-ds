@@ -4,7 +4,7 @@ from src.module_1.module_1_meteo_api import process_data, VARIABLES
 
 
 def test_process_data():
-    test_variable = VARIABLES.split(",")[1]
+    test_variable = VARIABLES[1]
     data = pd.DataFrame(
         {
             "city": ["Rio", "Rio", "Rio"],
