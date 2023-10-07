@@ -2,10 +2,10 @@
 import requests
 import logging
 import time
-import sys
 import pandas as pd
 import matplotlib.pyplot as plt
 import urllib3
+
 # import json
 # import numpy as np
 
@@ -14,7 +14,7 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
-"""Define global variables"""
+# Define global variables
 
 API_URL = "https://climate-api.open-meteo.com/v1/climate?"
 
@@ -27,36 +27,63 @@ COORDINATES = {
     "Rio": {"latitude": -22.906847, "longitude": -43.172896},
 }
 
-VARIABLES = "temperature_2m_mean,precipitation_sum,soil_moisture_0_to_10cm_mean"
+VARIABLES = ["temperature_2m_mean", "precipitation_sum", "soil_moisture_0_to_10cm_mean"]
 
 # All models have data for the 3 variables except soil moisture
 # which is only provided by MRI_AGCM3 and EC_Earth
-MODELS = "CMCC_CM2_VHR4,FGOALS_f3_H,HiRAM_SIT_HR,MRI_AGCM3_2_S,EC_Earth3P_HR,MPI_ESM1_2_XR,NICAM16_8S" # noqa
+MODELS = [
+    "CMCC_CM2_VHR4",
+    "FGOALS_f3_H",
+    "HiRAM_SIT_HR,MRI_AGCM3_2_S",
+    "EC_Earth3P_HR",
+    "MPI_ESM1_2_XR,NICAM16_8S",
+]
 
 
-"""Define auxiliar functions"""
+# Define auxiliar functions
+
+# Configure logging system
+logging.basicConfig(
+    level=logging.INFO,  # Set logging level (others: DEBUG, WARNING, ERROR, etc.)
+    format="%(levelname)s - %(message)s",  # Define the log message format
+)
+
 
 def call_api(url):
-    # Need to add the verify=False as working from my corporate laptop.
-    # Tried to authenticate SSL by changing lots of config, disabled SSL, etc
-    # It only works from the office - not the best practice I know # noqa
-    try:
-        # to-do: add the cool off
-        response = requests.get(url, verify=False)
-        if response.status_code == 200:
-            print("\nConnected Succesfully!")
-            return response
-        else:
-            logging.error(f"\nAPI request failed with Code: {response.status_code}")
-            return None
-    except requests.exceptions.RequestException as exception:
-        logging.error(f"\nAPI request failed with Exception: {exception}")
-        return None
+    """Call API and return response.
+
+    Need to add the verify=False as working from my corporate laptop.
+    Tried to authenticate SSL by changing lots of config, disabled SSL, etc
+    It only works from the office - not the best practice I know # noqa
+    """
+    retry_count = 0
+
+    while retry_count < MAX_RETRY_ATTEMPTS:
+        try:
+            # to-do: add the cool off
+            response = requests.get(url, verify=False)
+            if response.status_code == 200:
+                logging.info("API request connected successfully")
+                return response
+            else:
+                logging.error(f"\nAPI request failed with Code: {response.status_code}")
+        except requests.exceptions.RequestException as exception:
+            logging.error(
+                f"\nAPI request to url: {url} failed with Exception: {exception}"
+            )
+
+        retry_count += 1
+        if retry_count < MAX_RETRY_ATTEMPTS:
+            print(f"Retrying after {COOL_OFF_TIME} seconds...\n")
+            time.sleep(COOL_OFF_TIME)
+
+    logging.warning("Maximum retry attempts reached. Stopping the execution")
+    return
 
 
 def get_data_meteo_api(city, from_year, until_year):
     coordinates = COORDINATES.get(city)
-    if coordinates is None:
+    if city not in COORDINATES:
         print("No data for the city")
         return None
 
@@ -65,24 +92,20 @@ def get_data_meteo_api(city, from_year, until_year):
     long = coordinates["longitude"]
 
     # Create the final URL
+    models_str = ",".join(MODELS)
+    variables_str = ",".join(VARIABLES)
+
     url = (
         f"{API_URL}latitude={lat}&longitude={long}&start_date={from_year}"
-        f"-01-01&end_date={until_year}-12-31&models={MODELS}&daily={VARIABLES}"
+        f"-01-01&end_date={until_year}-12-31&models={models_str}&daily={variables_str}"
     )
 
-    # Define a num of max attempts for calling again
-    retry_count = 0
-
-    while retry_count < MAX_RETRY_ATTEMPTS:
-        data = call_api(url)
-        if data:
-            return data.json()
-        else:
-            print(f"Retrying after {COOL_OFF_TIME} seconds again...\n")
-            time.sleep(COOL_OFF_TIME)
-            retry_count += 1
-    print("You reached the number of maximum attempts. Stopping the execution")
-    sys.exit()
+    data = call_api(url)
+    if data:
+        return data.json()
+    else:
+        print("Failed to retrieve data from the API.")
+        return None
 
 
 def clean_data(raw_data):
@@ -117,7 +140,7 @@ def process_data(data):
     Reads a df and for each city calculates mean + std for each variable
     """
     calculated_df = data[["city", "time"]].copy()
-    for var in VARIABLES.split(","):
+    for var in VARIABLES:
         # For each climate var in the loop, if the name is in variable it's stored
         idxs = [col for col in data.columns if col.startswith(var)]
         # Save each variable with its corresponding mean and std (axis=1 per each row)
@@ -153,7 +176,7 @@ def plot_data(data):
         print(city_data.head())
 
         # Now for each variable we
-        for k, var in enumerate(VARIABLES.split(",")):
+        for k, var in enumerate(VARIABLES):
             city_data["mid_line"] = city_data[f"{var}_mean"]
             city_data["upper_line"] = city_data[f"{var}_mean"] + city_data[f"{var}_std"]
             city_data["lower_line"] = city_data[f"{var}_mean"] - city_data[f"{var}_std"]
@@ -204,3 +227,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# response = get_data_meteo_api("Madrid", 1950, 2050)
+# print(response)
