@@ -1,6 +1,10 @@
 import pandas as pd
+import requests
+from unittest.mock import Mock
 
-from src.module_1.module_1_meteo_api import process_data, VARIABLES
+# import pytest
+
+from src.module_1.module_1_meteo_api import process_data, VARIABLES, call_api
 
 
 def test_process_data():
@@ -40,3 +44,32 @@ def test_process_data():
         process_data(data)[info_cols + test_cols],
         expected,
     )
+
+
+class MockResponse:
+    def __init__(self, json_data, status_code):
+        self.json_data = json_data
+        self.status_code = status_code
+
+    def json(self):
+        return self.json_data
+
+    def raise_status(self):
+        if self.status_code != 200:
+            raise requests.exceptions.HTTPError(f"HTTPError: {self.status_code}")
+
+
+def test_call_api_200(monkeypatch):
+    mocked_response = Mock(return_value=MockResponse("mocked_response", 200))
+    monkeypatch.setattr(requests, "get", mocked_response)
+    response = call_api("mock_url")
+    assert response.status_code == 200
+    assert response.json() == "mocked_response"
+
+
+def test_call_api_404(monkeypatch):
+    mocked_response = Mock(return_value=MockResponse("Not Found", 404))
+    monkeypatch.setattr(requests, "get", mocked_response)
+    response = call_api("mock_url")
+    assert response.status_code == 404
+    assert response.json() == "Not Found"

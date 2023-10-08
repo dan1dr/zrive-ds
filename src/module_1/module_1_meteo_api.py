@@ -65,6 +65,9 @@ def call_api(url):
             if response.status_code == 200:
                 logging.info("API request connected successfully")
                 return response
+            elif response.status_code == 404:
+                logging.error(f"\nAPI request failed with Code: {response.status_code}")
+                return response  # Return the response for 404
             else:
                 logging.error(f"\nAPI request failed with Code: {response.status_code}")
         except requests.exceptions.RequestException as exception:
@@ -78,7 +81,7 @@ def call_api(url):
             time.sleep(COOL_OFF_TIME)
 
     logging.warning("Maximum retry attempts reached. Stopping the execution")
-    return
+    return response
 
 
 def get_data_meteo_api(city, from_year, until_year):
@@ -106,6 +109,7 @@ def get_data_meteo_api(city, from_year, until_year):
     else:
         print("Failed to retrieve data from the API.")
         return None
+
 
 def process_data(data):
     """
