@@ -21,6 +21,8 @@ fastparquet = "^2023.8.0"
 jupyter = "^1.0.0"
 ipykernel = "^6.25.2"
 seaborn = "^0.13.0"
+nbconvert = "^7.9.2"
+pandoc = "^2.3"
 
 
 [tool.poetry.group.dev.dependencies]
