@@ -75,7 +75,7 @@ def read_data(file_path: str) -> pd.DataFrame:
     Returns: pd.DataFrame
     """
     try:
-        data = pd.read_csv(file_path)
+        data = pd.read_csv(file_path, index_col=False)
 
         if data is not None and not data.empty:
             logging.info("Data loaded successfully.")
