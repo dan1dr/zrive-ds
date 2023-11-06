@@ -1,20 +1,11 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 import logging
 from datetime import timedelta, datetime
 
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_curve, auc, precision_recall_curve
-from sklearn.metrics import confusion_matrix, classification_report
-from sklearn.pipeline import Pipeline
-from sklearn.model_selection import GridSearchCV
 import joblib
-import pickle
 import os
 import json
 from typing import List, Dict, Optional
@@ -29,19 +20,31 @@ logging.basicConfig(
 
 # We will remeber the classification we did in previous notebook:
 
-predicted = ['outcome']
-information = ['variant_id', 'order_id', 'user_id', 'created_at', 'order_date']
-numerical = ['user_order_seq', 'normalised_price', 'discount_pct', 'global_popularity',
-            'count_adults', 'count_children', 'count_babies', 'count_pets', 
-            'people_ex_baby', 'days_since_purchase_variant_id', 
-            'avg_days_to_buy_variant_id', 'std_days_to_buy_variant_id',
-            'days_since_purchase_product_type', 'avg_days_to_buy_product_type',
-                'std_days_to_buy_product_type']
+predicted = ["outcome"]
+information = ["variant_id", "order_id", "user_id", "created_at", "order_date"]
+numerical = [
+    "user_order_seq",
+    "normalised_price",
+    "discount_pct",
+    "global_popularity",
+    "count_adults",
+    "count_children",
+    "count_babies",
+    "count_pets",
+    "people_ex_baby",
+    "days_since_purchase_variant_id",
+    "avg_days_to_buy_variant_id",
+    "std_days_to_buy_variant_id",
+    "days_since_purchase_product_type",
+    "avg_days_to_buy_product_type",
+    "std_days_to_buy_product_type",
+]
 
-categorical = ['product_type', 'vendor']
-binary = ['ordered_before', 'abandoned_before', 'active_snoozed', 'set_as_regular']
+categorical = ["product_type", "vendor"]
+binary = ["ordered_before", "abandoned_before", "active_snoozed", "set_as_regular"]
 
 cols_with_categ = numerical + binary + categorical + predicted
+
 
 def assess_NA(data: pd.DataFrame):
     """
@@ -90,6 +93,7 @@ def read_data(file_path: str) -> pd.DataFrame:
         logging.error(
             f"Error: An unexpected error occurred while loading the data. Details {e}"
         )
+
 
 def preprocess_data(
     data: pd.DataFrame, remove_if_all_na: bool = False, num_items: int = 5
@@ -263,9 +267,7 @@ def generate_evaluation_curves(
     plt.legend(loc="lower right")
 
     plt.subplot(1, 2, 2)
-    plt.plot(
-        recall, precision, label=f"PR (AUC = {pr_auc:.2f}) - {model_name}"
-    )
+    plt.plot(recall, precision, label=f"PR (AUC = {pr_auc:.2f}) - {model_name}")
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
     plt.xlabel("Recall")
@@ -284,11 +286,23 @@ def generate_evaluation_curves(
 
     plt.show()
 
-def train_catboost_model(X_train: pd.DataFrame, y_train: pd.Series,
-                         X_val: pd.DataFrame, y_val: pd.Series,
-                         params: Dict,
-                         X_test: Optional[pd.DataFrame] = None, 
-                         y_test: Optional[pd.Series] = None) -> CatBoostClassifier:
+
+def find_precision_threshold(y_val, y_scores, target_precision=0.25):
+    precisions, recalls, thresholds = precision_recall_curve(y_val, y_scores)
+    # Find the closest precision to the target precision
+    idx = np.argmin(np.abs(precisions - target_precision))
+    return thresholds[idx]
+
+
+def train_catboost_model(
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    X_val: pd.DataFrame,
+    y_val: pd.Series,
+    params: Dict,
+    X_test: Optional[pd.DataFrame] = None,
+    y_test: Optional[pd.Series] = None,
+) -> CatBoostClassifier:
     """
     Trains a CatBoostClassifier model.
 
@@ -299,7 +313,8 @@ def train_catboost_model(X_train: pd.DataFrame, y_train: pd.Series,
     - val_labels (pd.Series): The validation dataset labels.
     - test_data (pd.DataFrame, optional): The test dataset features.
     - test_labels (pd.Series, optional): The test dataset labels.
-    - params (Dict): Dictionary containing the training parameters, which must include the names of categorical features.
+    - params (Dict): Dictionary containing the training parameters,
+    which must include the names of categorical features.
 
     Returns:
     - CatBoostClassifier: The trained CatBoost model.
@@ -307,45 +322,54 @@ def train_catboost_model(X_train: pd.DataFrame, y_train: pd.Series,
 
     # Get the list of categorical feature names and remove it from params
     # (should not be passed to CatBoostClassifier later on)
-    categorical_features = params.pop('categorical_features', None)
-    categorical_features_indices = [X_train.columns.get_loc(col) for col in categorical_features]
+    categorical_features = params.pop("categorical_features", None)
+    categorical_features_indices = [
+        X_train.columns.get_loc(col) for col in categorical_features
+    ]
 
     # Create CatBoost Pool for train and validation sets
     train_pool = Pool(X_train, y_train, cat_features=categorical_features_indices)
     val_pool = Pool(X_val, y_val, cat_features=categorical_features_indices)
-    
+
     # Optionally create a Pool for the test set
-    test_pool = None
+    test_pool = None  # noqa
     if X_test is not None and y_test is not None:
-        test_pool = Pool(X_test, y_test, cat_features=categorical_features_indices)
+        test_pool = Pool( # noqa
+            X_test, y_test, cat_features=categorical_features_indices
+        )
 
     catboost_model = CatBoostClassifier(**params)
-    
+
     # Train the model
     catboost_model.fit(train_pool, eval_set=val_pool)
 
-    return catboost_model
+    # Calculate precision threshold
+    threshold = find_precision_threshold(
+        y_val, catboost_model.predict_proba(X_val)[:, 1]
+    )
+
+    return catboost_model, threshold
+
 
 def handler_fit(event: dict) -> dict:
     """
     The handler function to load data, train the model, and save it to disk.
 
     Parameters:
-    - event (dict): Dictionary with input parameters such as data path, model parameters, etc.
+    - event (dict): Dictionary with input parameters such as path, params, etc.
 
     Returns:
     - dict: Dictionary with model information such as model name, path, etc.
     """
     try:
         # Extract parameters from event or set defaults
-        data_path = event.get('data_path')
-        preprocessing_params = event.get('preprocessing_params', {})
-        split_params = event.get('split_params', {})
-        #model_parametrisation = event["model_parametrisation"]
-        model_parametrisation = event.get('model_parametrisation', {})
-        save_model_path = event.get('save_model_path', 'models/')
-        save_curves_path = event.get('save_curves_path', 'src/module_4/figures')
-
+        data_path = event.get("data_path")
+        preprocessing_params = event.get("preprocessing_params", {})
+        split_params = event.get("split_params", {})
+        # model_parametrisation = event["model_parametrisation"]
+        model_parametrisation = event.get("model_parametrisation", {})
+        save_model_path = event.get("save_model_path")
+        save_curves_path = event.get("save_curves_path")
 
         # Load and preprocess data
         data = read_data(data_path)
@@ -357,9 +381,11 @@ def handler_fit(event: dict) -> dict:
         )
 
         # Train model
-        model = train_catboost_model(
-            X_train, y_train,
-            X_val, y_val, 
+        model, threshold = train_catboost_model(
+            X_train,
+            y_train,
+            X_val,
+            y_val,
             model_parametrisation,
         )
 
@@ -369,54 +395,59 @@ def handler_fit(event: dict) -> dict:
         model_path = os.path.join(save_model_path, model_name)
         joblib.dump(model, model_path)
 
-        generate_evaluation_curves(model_name, model.predict_proba(X_test)[:, 1], y_test, save_curves_path)
-
+        # Generate curves
+        generate_evaluation_curves(
+            model_name, model.predict_proba(X_val)[:, 1], y_val, save_curves_path
+        )
 
         # Return the output dictionary
         return {
             "statusCode": "200",
             "body": json.dumps(
-                {"model_path": model_path,
-                 "curves_path": save_curves_path})
-            }
+                {
+                    "model_path": model_path,
+                    "curves_path": save_curves_path,
+                    "threshold probability": threshold,
+                }
+            ),
+        }
     except Exception as e:
         traceback.print_exc()  # This will print the stack trace
-        return {
-            "statusCode": "500",
-            "body": json.dumps({"error": str(e)})
-        }
-    
- # Define input parameters with all the necessary details
+        return {"statusCode": "500", "body": json.dumps({"error": str(e)})}
+
+
+# Define input parameters with all the necessary details
 event = {
-    'data_path': '/home/dan1dr/data/feature_frame.csv',
-    'preprocessing_params': {
-        'remove_if_all_na': True,
-        'num_items': 5,
+    "data_path": "/home/dan1dr/data/feature_frame.csv",
+    "preprocessing_params": {
+        "remove_if_all_na": True,
+        "num_items": 5,
     },
-    'split_params': {
-        'validation_days': 10,
-        'test_days': 10,
-        'label': 'outcome',
-        'cols': cols_with_categ,
+    "split_params": {
+        "validation_days": 10,
+        "test_days": 10,
+        "label": "outcome",
+        "cols": cols_with_categ,
     },
-    'model_parametrisation': {
-    'iterations': 200,
-    'learning_rate': 0.1,
-    'depth': 6,
-    'loss_function': 'Logloss',
-    'eval_metric': 'AUC',
-    'random_seed': 42,
-    'verbose': 50,
-    'categorical_features': ['product_type', 'vendor']
-    }
-,
-    'save_model_path': 'src/module_4/models',
-    'save_curves_path': 'src/module_4/figures',
+    "model_parametrisation": {
+        "iterations": 200,
+        "learning_rate": 0.1,
+        "depth": 6,
+        "loss_function": "Logloss",
+        "eval_metric": "AUC",
+        "random_seed": 42,
+        "verbose": 50,
+        "categorical_features": ["product_type", "vendor"],
+    },
+    "save_model_path": "src/module_4/models",
+    "save_curves_path": "src/module_4/figures",
 }
+
 
 def main():
     model_info = handler_fit(event)
     print(model_info)
-   
+
+
 if __name__ == "__main__":
     main()
