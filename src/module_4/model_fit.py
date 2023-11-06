@@ -113,9 +113,11 @@ def preprocess_data(
     try:
         initial_length = len(data)
         if remove_if_all_na:  # remove if everything is NA
-            data = data.dropna(how="all")
+            data = data.dropna(
+                how="all",
+            )
         else:
-            data = data.dropna()
+            data = data.dropna(how="any")
         dropped_length = len(data)
 
         # Filter orders with >= 5 items
@@ -130,7 +132,12 @@ def preprocess_data(
 
     except FileNotFoundError as e:
         logging.error(f"Error: File not found. Details {e}")
-        return
+    except ValueError as e:
+        logging.error(f"ValueError: {e}")
+    except KeyError as e:
+        logging.error(f"KeyError: {e}")
+    except TypeError as e:
+        logging.error(f"TypeError: {e}")
 
 
 def split_sets(df: pd.DataFrame, label: str) -> (pd.DataFrame, pd.Series):
@@ -334,7 +341,7 @@ def train_catboost_model(
     # Optionally create a Pool for the test set
     test_pool = None  # noqa
     if X_test is not None and y_test is not None:
-        test_pool = Pool( # noqa
+        test_pool = Pool(  # noqa
             X_test, y_test, cat_features=categorical_features_indices
         )
 
