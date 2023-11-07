@@ -3,11 +3,11 @@
 The task consists on continuing the work done before during previous module, with the addition of playing with non-linear models to improve the performance. Moreover, we're again asked to build a MVP within a API developed by our engineering team, so it must have a fit code and a inference code which later on we will define separatedly.
 
 We will take all the decision and filters as granted from previous module, despite not being the best nor most accurate, such as:
-- Baseline might be a linear model or global_popularity
-- Feature selection might be more extensive
+- Different baselines, we would use linear regression from previous module.
+- Feature selection might be more extensive.
 - Splittig sets using cumulative data instead of hard coded %'s. Even apply cross-validation addressing data leakages (ordered_before, global_popularity also if we are very nitpicky)
 
-So we will copy all previous code and start from there applyin non-linear models, hence our baseline in this module would be the best model choosen in previous one (ridge regularisation with C=1e-5)
+So we will copy all previous code and start from there applying non-linear models, hence our baseline in this module would be the best model chosen in previous one (lr with ridge regularisation C=1e-5)
 
 ## Import libraries
 
@@ -426,6 +426,8 @@ We will apply different models and compare against previous results, in the foll
 - Decision Trees
 - Random Forests
 - Gradient Bosting Trees
+- XGBoost
+- Catboost
 
 In that sense, let's modify the generate_evaluation_curves to plot multiple funcs at the same time, in order to compare visually the performance of each model vs. baseline.
 
@@ -1493,8 +1495,8 @@ the selected items
 From there, I'll give some thresholds for some dimensions and we could later on decide more visually/creatively the working point:
 
 - If open rate is around 5%, and if we believe our probability values are well calibrated, we would be playing for probabilities > 0.05
-- If unistallations are that costly, let's aim to have at least >25% precision (1/4 of targeted users will buy the item)
-- Let's try to be relatively sensitive to potential buyers, so let's fix recall at minimun >20%
+- If unistallations are that costly, let's aim to have at least >= 25% precision (1/4 of targeted users will buy the item)
+- Let's try to be relatively sensitive to potential buyers, so let's fix recall at minimun >= 20%
 
 Let's plot that:
 
