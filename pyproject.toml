@@ -12,10 +12,14 @@ matplotlib = "^3.7.2"
 numpy = "^1.25.2"
 sklearn = "^0.0.post7"
 requests = "^2.31.0"
-black = "^23.7.0"
+black = {extras = ["jupyter"], version = "^23.11.0"}
 flake8 = "^6.1.0"
 mypy = "^1.5.1"
 pytest = "^7.4.0"
+lightgbm = "^4.1.0"
+plotnine = "^0.12.4"
+pyarrow = "^14.0.1"
+shap = "^0.43.0"
 
 
 [build-system]
